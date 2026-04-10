@@ -31,7 +31,7 @@ export function FileDetailsView({ documentId }: FileDetailsViewProps) {
     const selectedTableId = params?.tableId || null;
 
     const jobs = useExtractionStore(state => state.jobs);
-    const setFocusedDocumentIds = useExtractionStore(state => state.setFocusedDocumentIds);
+    const setFocusedSpaceIds = useExtractionStore(state => state.setFocusedSpaceIds);
     const job = jobs[documentId];
 
     const [tables, setTables] = useState<any[]>([]);
@@ -188,9 +188,10 @@ export function FileDetailsView({ documentId }: FileDetailsViewProps) {
                         variant="outline"
                         size="sm"
                         className="gap-2 h-8 w-8 px-0 sm:h-9 sm:px-3 sm:w-auto"
-                        onClick={() => {
-                            setFocusedDocumentIds([documentId]);
-                            setLocation(`/chat?focus_docs=${documentId}`);
+                        onClick={async () => {
+                            const defaultSpace = await dbService.getDefaultContextSpace();
+                            setFocusedSpaceIds([defaultSpace.id]);
+                            setLocation(`/chat?focus_spaces=${defaultSpace.id}`);
                         }}
                     >
                         <MessageSquare className="h-4 w-4" />

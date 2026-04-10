@@ -1,0 +1,78 @@
+{
+  "manifest_version": 3,
+  "name": "MEMUX Companion",
+  "version": "0.1.0",
+  "description": "MEMUX overlay + scroll bridge for bookmark and snip capture from any page.",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://localhost:3000/*",
+    "http://localhost:4173/*",
+    "http://localhost:5173/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "MEMUX Capture"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "http://localhost:4173/*",
+        "http://localhost:5173/*"
+      ],
+      "js": [
+        "app-bridge.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "page-structure-extractor.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "whatsapp-chat-extractor.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "overlay.js"
+      ],
+      "exclude_matches": [
+        "http://localhost:3000/*",
+        "http://localhost:4173/*",
+        "http://localhost:5173/*"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "page-controller.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -8,9 +8,10 @@ interface DeleteConfirmModalProps {
     documentId: string
     filename: string
     iconOnly?: boolean
+    triggerClassName?: string
 }
 
-export function DeleteConfirmModal({ documentId, filename, iconOnly }: DeleteConfirmModalProps) {
+export function DeleteConfirmModal({ documentId, filename, iconOnly, triggerClassName }: DeleteConfirmModalProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
     const trashJob = useExtractionStore(state => state.trashJob)
@@ -34,7 +35,7 @@ export function DeleteConfirmModal({ documentId, filename, iconOnly }: DeleteCon
                 <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                    className={triggerClassName || "h-6 w-6 text-muted-foreground hover:text-destructive transition-colors shrink-0"}
                     onClick={() => setIsOpen(true)}
                     title="Delete"
                 >

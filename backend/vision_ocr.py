@@ -84,3 +84,51 @@ def extract_text_from_image(base64_image: str) -> Dict[str, str]:
                 "error": str(e)
             }
         }
+
+
+BOOKMARK_TITLE_INFER_PROMPT = """You are looking at a screenshot of the first visible section of a bookmarked webpage.
+The raw page <title> tag says: "{raw_title}"
+
+Your task: produce a short, human-friendly bookmark title that clearly communicates:
+1. The BRAND or PRODUCT name visible in the page (logo text, header, hero text — whatever identifies the site ownership)
+2. The SPECIFIC PAGE topic (what this particular page is about)
+
+Format: "Brand · Page Topic"  (use · as separator)
+- If the raw title already clearly includes the brand, clean it up and return as-is.
+- Keep it under 80 characters.
+- Return ONLY the title string, nothing else. No quotes, no explanation."""
+
+
+def infer_bookmark_title(base64_image: str, raw_title: str) -> str:
+    """
+    Use the vision model to infer a brand-aware bookmark title from the first screenshot.
+    Falls back to raw_title on any failure.
+    """
+    try:
+        image_url = f"data:image/png;base64,{base64_image}"
+        prompt = BOOKMARK_TITLE_INFER_PROMPT.format(raw_title=raw_title or "Untitled Bookmark")
+
+        completion = get_next_client().chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": image_url}}
+                    ]
+                }
+            ],
+            temperature=0,
+            max_tokens=60
+        )
+
+        inferred = (completion.choices[0].message.content or "").strip().strip('"').strip("'")
+        if inferred and 3 < len(inferred) < 160:
+            return inferred
+        return raw_title or "Untitled Bookmark"
+
+    except Exception as e:
+        print(f"Title inference error: {e}")
+        return raw_title or "Untitled Bookmark"
+

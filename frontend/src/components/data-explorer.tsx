@@ -12,51 +12,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Play, RefreshCw, Database, FileText, Layers, ChevronRight } from "lucide-react"
 
 const CORE_TABLES = [
     { name: "documents", icon: FileText, label: "Documents" },
     { name: "pdf_tables", icon: Layers, label: "PDF Tables" },
     { name: "chunks", icon: Database, label: "Chunks" },
+    { name: "context_spaces", icon: Layers, label: "Context Spaces" },
+    { name: "context_sources", icon: FileText, label: "Context Sources" },
+    { name: "context_assets", icon: FileText, label: "Context Assets" },
+    { name: "context_segments", icon: Database, label: "Context Segments" },
 ]
 
-function JsonCell({ value }: { value: any }) {
-    const [expanded, setExpanded] = useState(false)
-
-    if (value === null || value === undefined) {
-        return <span className="text-muted-foreground italic">null</span>
-    }
-
-    if (typeof value !== 'object') {
-        return <span>{String(value)}</span>
-    }
-
-    const json = JSON.stringify(value, null, 2)
-    const preview = JSON.stringify(value).slice(0, 60)
-
-    return (
-        <div className="max-w-xs">
-            {expanded ? (
-                <pre
-                    className="text-xs bg-muted/50 rounded p-2 whitespace-pre-wrap cursor-pointer max-h-48 overflow-auto"
-                    onClick={() => setExpanded(false)}
-                >
-                    {json}
-                </pre>
-            ) : (
-                <span
-                    className="text-xs cursor-pointer hover:text-primary transition-colors font-mono"
-                    onClick={() => setExpanded(true)}
-                    title="Click to expand"
-                >
-                    {preview.length > 60 ? preview + '…' : preview}
-                </span>
-            )}
-        </div>
-    )
-}
-
-function formatCell(key: string, value: any) {
+function formatPreviewValue(key: string, value: any) {
     // Hide vector embeddings — too large to display
     if (key.includes('embedding')) {
         if (!value) return <span className="text-muted-foreground italic">null</span>
@@ -68,7 +37,12 @@ function formatCell(key: string, value: any) {
     }
 
     if (typeof value === 'object') {
-        return <JsonCell value={value} />
+        const preview = JSON.stringify(value).slice(0, 80)
+        return (
+            <span className="text-xs cursor-pointer hover:text-primary transition-colors font-mono">
+                {preview.length > 80 ? preview + '…' : preview}
+            </span>
+        )
     }
 
     // Truncate long text
@@ -80,6 +54,20 @@ function formatCell(key: string, value: any) {
     return <span>{str}</span>
 }
 
+function shouldOpenCellModal(key: string, value: any) {
+    if (key.includes('embedding')) return false;
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'object') return true;
+    if (typeof value === 'string') return value.length > 80;
+    return false;
+}
+
+function formatFullValue(value: any): string {
+    if (value === null || value === undefined) return "null";
+    if (typeof value === "object") return JSON.stringify(value, null, 2);
+    return String(value);
+}
+
 export default function DataExplorer() {
     const [activeTable, setActiveTable] = useState<string>("documents")
     const [tableData, setTableData] = useState<any[]>([])
@@ -87,6 +75,11 @@ export default function DataExplorer() {
     const [queryResult, setQueryResult] = useState<any[]>([])
     const [error, setError] = useState<string | null>(null)
     const [rowCount, setRowCount] = useState<Record<string, number>>({})
+    const [selectedCell, setSelectedCell] = useState<{
+        table: string;
+        column: string;
+        value: any;
+    } | null>(null)
 
     useEffect(() => {
         fetchTableData(activeTable)
@@ -144,9 +137,24 @@ export default function DataExplorer() {
 
     return (
         <div className="h-full flex flex-col space-y-4">
+            <Dialog open={!!selectedCell} onOpenChange={(open) => !open && setSelectedCell(null)}>
+                <DialogContent className="max-w-[92vw] sm:max-w-4xl border border-border dark:border-white/10 bg-card dark:bg-[#2f3136] rounded-3xl">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {selectedCell ? `${selectedCell.table}.${selectedCell.column}` : "Cell Details"}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="max-h-[70vh] overflow-auto cx-subpanel p-3">
+                        <pre className="text-xs whitespace-pre-wrap break-words font-mono">
+                            {selectedCell ? formatFullValue(selectedCell.value) : ""}
+                        </pre>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold tracking-tight">Data Explorer</h2>
-                <Button variant="outline" size="sm" onClick={refresh}>
+                <Button variant="outline" size="sm" className="rounded-full border-border dark:border-white/10" onClick={refresh}>
                     <RefreshCw className="mr-2 h-3.5 w-3.5" />
                     Refresh
                 </Button>
@@ -154,7 +162,7 @@ export default function DataExplorer() {
 
             <div className="flex flex-1 gap-4 h-full overflow-hidden">
                 {/* Sidebar: Core Tables */}
-                <Card className="w-56 flex flex-col shrink-0">
+                <Card className="w-56 flex flex-col shrink-0 cx-surface">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">Core Tables</CardTitle>
                     </CardHeader>
@@ -166,9 +174,9 @@ export default function DataExplorer() {
                                 return (
                                     <button
                                         key={t.name}
-                                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${isActive
-                                            ? 'bg-primary/10 text-primary font-medium'
-                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm transition-colors ${isActive
+                                            ? 'cx-pill-active font-medium'
+                                            : 'text-muted-foreground hover:text-foreground hover:bg-white/8 dark:hover:bg-white/8'
                                             }`}
                                         onClick={() => fetchTableData(t.name)}
                                     >
@@ -187,9 +195,9 @@ export default function DataExplorer() {
                 <div className="flex-1 flex flex-col overflow-hidden">
                     <Tabs defaultValue="browse" className="flex-1 flex flex-col">
                         <div className="flex items-center justify-between shrink-0">
-                            <TabsList>
-                                <TabsTrigger value="browse">Browse Data</TabsTrigger>
-                                <TabsTrigger value="sql">SQL Editor</TabsTrigger>
+                            <TabsList className="h-10 rounded-full border border-border dark:border-white/10 bg-muted/60 dark:bg-[#2b2d31] p-1 gap-1">
+                                <TabsTrigger value="browse" className="rounded-full data-[state=active]:cx-pill-active">Browse Data</TabsTrigger>
+                                <TabsTrigger value="sql" className="rounded-full data-[state=active]:cx-pill-active">SQL Editor</TabsTrigger>
                             </TabsList>
                             {activeTable && (
                                 <span className="text-xs text-muted-foreground font-mono">
@@ -198,14 +206,14 @@ export default function DataExplorer() {
                             )}
                         </div>
 
-                        <TabsContent value="browse" className="flex-1 border rounded-md p-0 overflow-auto mt-2">
+                        <TabsContent value="browse" className="flex-1 border border-border dark:border-white/10 rounded-3xl p-0 overflow-auto mt-2 bg-card dark:bg-[#2f3136]">
                             {tableData.length > 0 ? (
                                 <div className="overflow-auto h-full">
                                     <Table className="min-w-max">
-                                        <TableHeader>
+                                        <TableHeader className="cx-table-header sticky top-0">
                                             <TableRow>
                                                 {Object.keys(tableData[0]).map((key) => (
-                                                    <TableHead key={key} className="text-xs font-semibold whitespace-nowrap">
+                                                    <TableHead key={key} className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                                                         {key}
                                                     </TableHead>
                                                 ))}
@@ -213,10 +221,21 @@ export default function DataExplorer() {
                                         </TableHeader>
                                         <TableBody>
                                             {tableData.map((row, i) => (
-                                                <TableRow key={i}>
+                                                <TableRow key={i} className="cx-row-hover">
                                                     {Object.entries(row).map(([key, val], j) => (
-                                                        <TableCell key={j} className="text-xs py-2">
-                                                            {formatCell(key, val)}
+                                                        <TableCell
+                                                            key={j}
+                                                            className={`text-xs py-2 ${shouldOpenCellModal(key, val) ? 'cursor-pointer' : ''}`}
+                                                            onClick={() => {
+                                                                if (!shouldOpenCellModal(key, val)) return;
+                                                                setSelectedCell({
+                                                                    table: activeTable,
+                                                                    column: key,
+                                                                    value: val
+                                                                });
+                                                            }}
+                                                        >
+                                                            {formatPreviewValue(key, val)}
                                                         </TableCell>
                                                     ))}
                                                 </TableRow>
@@ -238,26 +257,26 @@ export default function DataExplorer() {
                                     value={sqlQuery}
                                     onChange={(e) => setSqlQuery(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && runQuery()}
-                                    className="font-mono text-xs"
+                                    className="font-mono text-xs cx-input"
                                 />
-                                <Button onClick={runQuery} size="sm">
+                                <Button onClick={runQuery} size="sm" className="rounded-full">
                                     <Play className="mr-1.5 h-3.5 w-3.5" /> Run
                                 </Button>
                             </div>
 
                             {error && (
-                                <div className="p-3 mb-3 bg-destructive/15 text-destructive rounded-md font-mono text-xs">
+                                <div className="p-3 mb-3 bg-destructive/15 text-destructive rounded-2xl font-mono text-xs border border-destructive/30">
                                     {error}
                                 </div>
                             )}
 
-                            <div className="flex-1 border rounded-md overflow-auto">
+                            <div className="flex-1 border border-border dark:border-white/10 rounded-3xl overflow-auto bg-card dark:bg-[#2f3136]">
                                 {queryResult.length > 0 ? (
                                     <Table className="min-w-max">
-                                        <TableHeader>
+                                        <TableHeader className="cx-table-header sticky top-0">
                                             <TableRow>
                                                 {Object.keys(queryResult[0]).map((key) => (
-                                                    <TableHead key={key} className="text-xs font-semibold whitespace-nowrap">
+                                                    <TableHead key={key} className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                                                         {key}
                                                     </TableHead>
                                                 ))}
@@ -265,10 +284,21 @@ export default function DataExplorer() {
                                         </TableHeader>
                                         <TableBody>
                                             {queryResult.map((row, i) => (
-                                                <TableRow key={i}>
+                                                <TableRow key={i} className="cx-row-hover">
                                                     {Object.entries(row).map(([key, val], j) => (
-                                                        <TableCell key={j} className="text-xs py-2">
-                                                            {formatCell(key, val)}
+                                                        <TableCell
+                                                            key={j}
+                                                            className={`text-xs py-2 ${shouldOpenCellModal(key, val) ? 'cursor-pointer' : ''}`}
+                                                            onClick={() => {
+                                                                if (!shouldOpenCellModal(key, val)) return;
+                                                                setSelectedCell({
+                                                                    table: "query_result",
+                                                                    column: key,
+                                                                    value: val
+                                                                });
+                                                            }}
+                                                        >
+                                                            {formatPreviewValue(key, val)}
                                                         </TableCell>
                                                     ))}
                                                 </TableRow>

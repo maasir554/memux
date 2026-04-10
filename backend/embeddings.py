@@ -28,7 +28,7 @@ def get_next_gemini_key():
 
 
 def generate_embeddings(texts: list[str]) -> list[list[float]]:
-    """Generates 768-dimensional embeddings for a list of texts using Gemini API."""
+    """Generates 3072-dimensional embeddings for a list of texts using Gemini API."""
     if not texts:
         return []
         
@@ -41,14 +41,17 @@ def generate_embeddings(texts: list[str]) -> list[list[float]]:
         client = genai.Client(api_key=api_key)
         
         # We can pass a list of strings directly to generate embeddings in batch
-        # Using gemini-embedding-001 which produces 768d vectors
+        # Using gemini-embedding-001 which produces 3072d vectors
         result = client.models.embed_content(
             model="gemini-embedding-001",
             contents=texts,
         )
         
         # result.embeddings is a list of objects that have a .values attribute
-        return [emb.values for emb in result.embeddings]
+        if result.embeddings:
+            return [list(emb.values) if emb.values else [0.0] * 3072 for emb in result.embeddings]
+        else:
+            return [[0.0] * 3072 for _ in texts]
         
     except Exception as e:
         print(f"Error generating embeddings: {e}")

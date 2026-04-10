@@ -18,9 +18,10 @@ interface ExtractionDebugModalProps {
         prompt: string;
         rawResponse: string;
     }>;
+    triggerClassName?: string;
 }
 
-export function ExtractionDebugModal({ debugInfo }: ExtractionDebugModalProps) {
+export function ExtractionDebugModal({ debugInfo, triggerClassName }: ExtractionDebugModalProps) {
     // If no debug info at all, don't render button
     if (!debugInfo || Object.keys(debugInfo).length === 0) return null;
 
@@ -56,7 +57,12 @@ export function ExtractionDebugModal({ debugInfo }: ExtractionDebugModalProps) {
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6" title="Inspect Extraction Details">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className={triggerClassName || "h-6 w-6"}
+                    title="Inspect Extraction Details"
+                >
                     <Eye className="h-4 w-4" />
                 </Button>
             </DialogTrigger>

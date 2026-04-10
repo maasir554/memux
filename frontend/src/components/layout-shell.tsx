@@ -1,18 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRoute, useLocation } from 'wouter'
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import {
-    Menu, FileText, Database, MessageSquare,
-    Activity, ChevronsLeft, ChevronsRight, ExternalLink, Copy, Bot, Zap
+    Menu, Database, MessageSquare,
+    Activity, ChevronsLeft, ChevronsRight, Layers, ChevronDown, FlaskConical, SearchCode
 } from "lucide-react"
 import { NewPdfModal } from "@/components/new-pdf-modal"
 import { ProcessingQueue } from "@/components/processing-queue"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useExtractionStore } from '@/store/extraction-store'
-import examplesConfig from '@/config/examples.json'
+import { dbService, type ContextSpace } from '@/services/db-service'
 
 interface SidebarProps {
     className?: string
@@ -21,36 +20,90 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className, collapsed = false, onToggleCollapse }: SidebarProps) {
-    const [, setLocation] = useLocation();
+    const [location, setLocation] = useLocation();
+    const focusedSpaceIds = useExtractionStore(state => state.focusedSpaceIds);
+    const setFocusedSpaceIds = useExtractionStore(state => state.setFocusedSpaceIds);
+    const [spaces, setSpaces] = useState<ContextSpace[]>([]);
+
+    useEffect(() => {
+        (async () => {
+            await dbService.getDefaultContextSpace();
+            const loaded = await dbService.getContextSpaces();
+            setSpaces(loaded);
+            if (loaded.length > 0 && focusedSpaceIds.length === 0) {
+                setFocusedSpaceIds([loaded[0].id]);
+            }
+        })();
+    }, [focusedSpaceIds.length, setFocusedSpaceIds]);
+
+    const navButtonClass = (isActive: boolean) =>
+        `w-full h-9 rounded-full transition-colors ${collapsed ? 'justify-center px-0' : 'justify-start'} ` +
+        (isActive
+            ? 'bg-white text-black dark:bg-white dark:text-black hover:bg-white/90 dark:hover:bg-white/90'
+            : 'text-foreground/85 hover:text-foreground bg-transparent hover:bg-white/8 dark:hover:bg-white/8');
 
     return (
-        <div className={`pb-12 border-r bg-background h-screen flex flex-col transition-all duration-200 ease-in-out ${collapsed ? 'w-14' : 'w-60'} ${className ?? ''}`}>
+        <div className={`pb-12 border-r h-screen flex flex-col transition-all duration-200 ease-in-out ${collapsed ? 'w-14' : 'w-60'} ${className ?? ''} bg-background dark:bg-[#222326] border-border dark:border-white/10`}>
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Brand */}
-                <div className={`px-3 py-4 flex items-center ${collapsed ? 'justify-center' : 'gap-2 px-4'}`}>
-                    <span className="text-lg font-bold tracking-tight shrink-0">M</span>
-                    {!collapsed && <span className="text-lg font-semibold tracking-tight truncate">axcavator</span>}
+                <div className={`px-3 py-4 flex items-center ${collapsed ? 'justify-center' : 'gap-2 px-4'} bg-black/10 dark:bg-black/20`}>
+                    <div className="h-6 w-6 rounded-none shrink-0 bg-[#E79BB8]" />
+                    {!collapsed && (
+                        <span className="text-2xl leading-none font-space-mono font-bold tracking-tight truncate bg-gradient-to-r from-[#EEDFB5] via-[#DB96D1] via-[#E79BB8] to-[#F2C3A7] text-transparent bg-clip-text">
+                            MEMUX
+                        </span>
+                    )}
                 </div>
 
                 <Separator />
 
+                {!collapsed && (
+                    <div className="px-3 py-3.5 border-b border-border dark:border-white/10 space-y-2.5">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                            <Layers className="h-3 w-3" />
+                            Context Space
+                        </div>
+                        <div className="relative">
+                            <select
+                                value={focusedSpaceIds[0] || ""}
+                                onChange={(e) => setFocusedSpaceIds(e.target.value ? [e.target.value] : [])}
+                                className="w-full h-10 border rounded-full bg-background dark:bg-[#2d2f33] border-border dark:border-white/10 pl-4 pr-10 text-sm font-medium leading-none appearance-none"
+                            >
+                                {spaces.map(space => (
+                                    <option key={space.id} value={space.id}>
+                                        {space.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="h-4 w-4 text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+                        </div>
+                        <Button
+                            variant="ghost"
+                            className="w-full h-9 px-3 rounded-full text-sm justify-start text-foreground/90 hover:bg-white/8 dark:hover:bg-white/8"
+                            onClick={() => setLocation('/spaces')}
+                        >
+                            Manage Spaces
+                        </Button>
+                    </div>
+                )}
+
                 {/* Nav */}
                 <div className={`py-3 space-y-1 ${collapsed ? 'px-1.5' : 'px-3'}`}>
-                    <Button variant="ghost" className={`w-full ${collapsed ? 'justify-center px-0' : 'justify-start'}`} title="Chat Assistant" onClick={() => setLocation('/chat')}>
+                    <Button variant="ghost" className={navButtonClass(location.startsWith('/chat'))} title="Chat Assistant" onClick={() => setLocation('/chat')}>
                         <MessageSquare className="h-4 w-4 shrink-0" />
                         {!collapsed && <span className="ml-2 truncate">Chat & RAG</span>}
                     </Button>
-                    <Button variant="ghost" className={`w-full text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-500/5 hover:bg-indigo-500/15 ${collapsed ? 'justify-center px-0' : 'justify-start'}`} title="AI Agent" onClick={() => setLocation('/agent')}>
-                        <Bot className="h-4 w-4 shrink-0" />
-                        {!collapsed && <span className="ml-2 truncate">AI Agent</span>}
-                    </Button>
-                    <Button variant="ghost" className={`w-full ${collapsed ? 'justify-center px-0' : 'justify-start'}`} title="Data Explorer" onClick={() => setLocation('/data')}>
+                    <Button variant="ghost" className={navButtonClass(location.startsWith('/data'))} title="Data Explorer" onClick={() => setLocation('/data')}>
                         <Database className="h-4 w-4 shrink-0" />
                         {!collapsed && <span className="ml-2 truncate">Data Explorer</span>}
                     </Button>
-                    <Button variant="ghost" className={`w-full text-purple-600 dark:text-purple-400 font-medium bg-purple-500/5 hover:bg-purple-500/15 ${collapsed ? 'justify-center px-0' : 'justify-start'}`} title="Orchestrator" onClick={() => setLocation('/orchestrator')}>
-                        <Zap className="h-4 w-4 shrink-0" />
-                        {!collapsed && <span className="ml-2 truncate">Orchestrator</span>}
+                    <Button variant="ghost" className={navButtonClass(location.startsWith('/dev'))} title="Dev Tools" onClick={() => setLocation('/dev')}>
+                        <FlaskConical className="h-4 w-4 shrink-0" />
+                        {!collapsed && <span className="ml-2 truncate">Dev</span>}
+                    </Button>
+                    <Button variant="ghost" className={navButtonClass(location.startsWith('/chunks'))} title="Chunk Search" onClick={() => setLocation('/chunks')}>
+                        <SearchCode className="h-4 w-4 shrink-0" />
+                        {!collapsed && <span className="ml-2 truncate">Chunk Search</span>}
                     </Button>
                     <Sheet>
                         <SheetTrigger asChild>
@@ -75,54 +128,12 @@ export function Sidebar({ className, collapsed = false, onToggleCollapse }: Side
 
                 <Separator />
 
-                {/* New PDF + Recent Files */}
+                {/* Add Context */}
                 <div className={`py-3 flex-1 flex flex-col overflow-hidden ${collapsed ? 'px-1.5' : 'px-3'}`}>
                     {!collapsed && (
                         <div className="mb-3 px-1">
                             <NewPdfModal />
                         </div>
-                    )}
-
-                    {!collapsed && (
-                        <>
-                            <h2 className="mb-2 px-2 text-xs font-semibold tracking-wider uppercase text-muted-foreground">
-                                Example PDFs
-                            </h2>
-                            <ScrollArea className="flex-1 px-1 overflow-hidden w-full">
-                                <div className="space-y-2 pr-2 w-[210px] overflow-hidden">
-                                    {examplesConfig.map((example, idx) => (
-                                        <div key={idx} className="flex flex-col gap-1 p-2 rounded-md hover:bg-muted/50 transition-colors w-full min-w-0">
-                                            <div className="flex items-center gap-2 w-full min-w-0">
-                                                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                                <span className="truncate text-xs font-medium flex-1" title={example.name}>
-                                                    {example.name}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-1 pl-5">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6 rounded-sm text-muted-foreground hover:text-primary hover:bg-primary/10"
-                                                    onClick={() => window.open(example.url, '_blank')}
-                                                    title="Open Link in New Tab"
-                                                >
-                                                    <ExternalLink className="h-3 w-3" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6 rounded-sm text-muted-foreground hover:text-primary hover:bg-primary/10"
-                                                    onClick={() => navigator.clipboard.writeText(example.url)}
-                                                    title="Copy Link"
-                                                >
-                                                    <Copy className="h-3 w-3" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        </>
                     )}
 
                     {collapsed && (
@@ -134,7 +145,7 @@ export function Sidebar({ className, collapsed = false, onToggleCollapse }: Side
             </div>
 
             {/* Footer: Settings + Collapse */}
-            <div className={`border-t py-2 space-y-1 ${collapsed ? 'px-1.5' : 'px-3'}`}>
+            <div className={`border-t border-border dark:border-white/10 py-2 space-y-1 ${collapsed ? 'px-1.5' : 'px-3'}`}>
                 <ThemeToggle collapsed={collapsed} />
                 {onToggleCollapse && (
                     <Button variant="ghost" className={`w-full text-muted-foreground ${collapsed ? 'justify-center px-0' : 'justify-start'}`} onClick={onToggleCollapse} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
@@ -153,26 +164,29 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
     const [activityOpen, setActivityOpen] = useState(true)
     const [highlightedJobId, setHighlightedJobId] = useState<string | null>(null)
     const [isDocRoute] = useRoute('/document/:id/*?');
+    const [isSourceRoute] = useRoute('/source/:id/*?');
     const [location] = useLocation();
+    const isDetailRoute = isDocRoute || isSourceRoute;
 
     // Track job count to detect newly added jobs
     const jobs = useExtractionStore(state => state.jobs);
-    const prevJobCountRef = useRef(Object.keys(jobs).length);
+    const contextJobs = useExtractionStore(state => state.contextJobs);
+    const prevJobCountRef = useRef(Object.keys(jobs).length + Object.keys(contextJobs).length);
 
     useEffect(() => {
-        const currentCount = Object.keys(jobs).length;
+        const jobIds = [...Object.keys(jobs), ...Object.keys(contextJobs)];
+        const currentCount = jobIds.length;
         if (currentCount > prevJobCountRef.current) {
             // A new job was added — expand the activity queue and highlight
             setActivityOpen(true);
-            const allIds = Object.keys(jobs);
-            const newestId = allIds[allIds.length - 1];
+            const newestId = jobIds[jobIds.length - 1];
             setHighlightedJobId(newestId);
             // Clear highlight after animation
             const timer = setTimeout(() => setHighlightedJobId(null), 2000);
             return () => clearTimeout(timer);
         }
         prevJobCountRef.current = currentCount;
-    }, [jobs]);
+    }, [jobs, contextJobs]);
 
     return (
         <div className="flex min-h-screen bg-background text-foreground font-sans antialiased">
@@ -186,7 +200,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
 
             {/* Mobile Left Sidebar */}
             <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-                <SheetTrigger asChild className={`absolute left-4 top-4 z-40 ${isDocRoute ? 'hidden' : 'md:hidden'}`}>
+                <SheetTrigger asChild className={`absolute left-4 top-4 z-40 ${isDetailRoute ? 'hidden' : 'md:hidden'}`}>
                     <Button variant="outline" size="icon">
                         <Menu className="h-4 w-4" />
                     </Button>

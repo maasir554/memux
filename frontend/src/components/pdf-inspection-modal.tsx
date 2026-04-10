@@ -13,9 +13,10 @@ import remarkGfm from 'remark-gfm'
 interface PdfInspectionModalProps {
     docId: string;
     iconOnly?: boolean;
+    triggerClassName?: string;
 }
 
-export function PdfInspectionModal({ docId, iconOnly }: PdfInspectionModalProps) {
+export function PdfInspectionModal({ docId, iconOnly, triggerClassName }: PdfInspectionModalProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageInput, setPageInput] = useState("1");
@@ -148,7 +149,11 @@ export function PdfInspectionModal({ docId, iconOnly }: PdfInspectionModalProps)
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 {iconOnly ? (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className={triggerClassName || "h-6 w-6 text-muted-foreground hover:text-foreground transition-colors shrink-0"}
+                    >
                         <ScanEye className="h-4 w-4" />
                     </Button>
                 ) : (

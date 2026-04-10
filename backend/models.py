@@ -50,72 +50,41 @@ class EmbedResponse(BaseModel):
 class RagRequest(BaseModel):
     user_query: str
     context_chunks: List[Dict]
+    conversation: Optional[List[Dict[str, str]]] = None
 
 class RagResponse(BaseModel):
     response: str
     used_chunk_ids: List[str]
+    debug_info: Optional[Dict[str, Any]] = None
 
-# Agentic Flow Models
-class AgentPlanRequest(BaseModel):
+
+class RagQueryTermsRequest(BaseModel):
     user_query: str
-    chat_history: Optional[List[Dict[str, str]]] = None
+    conversation: Optional[List[Dict[str, str]]] = None
 
-class AgentPlanResponse(BaseModel):
-    intent: str # 'data_lookup' or 'general_chat'
-    sub_queries: List[str] # specific search strings to run against vector DB
-    direct_response: Optional[str] = None # if general_chat, the immediate answer
+class RagQueryTermsResponse(BaseModel):
+    search_terms: List[str]
+    debug_info: Optional[Dict[str, Any]] = None
 
-class AgentAnswerRequest(BaseModel):
+class ShortlistChunk(BaseModel):
+    id: str
+    text_summary: str
+
+class ShortlistRequest(BaseModel):
     user_query: str
-    retrieved_chunks: List[Dict] # raw chunks from DB semantic search
-    chat_history: Optional[List[Dict[str, str]]] = None
+    candidates: List[ShortlistChunk]
 
-class AgentAnswerResponse(BaseModel):
-    response: str
-    used_chunk_ids: List[str]
+class ShortlistEvaluation(BaseModel):
+    id: str
+    to_keep: bool
 
+class ShortlistResponse(BaseModel):
+    evaluations: List[ShortlistEvaluation]
+    debug_info: Optional[Dict[str, Any]] = None
 
+class BookmarkRestructureChunkRequest(BaseModel):
+    current_chunk: Dict[str, Any]
+    refined_previous_chunk: Optional[Dict[str, Any]] = None
 
-# Orchestrator V2 Models (modular pipeline)
-
-class OrchestratorV2ClassifyRequest(BaseModel):
-    user_query: str
-    chat_history: Optional[List[Dict[str, str]]] = None
-
-class OrchestratorV2ClassifyResponse(BaseModel):
-    intent: str  # general_chat, data_lookup, meta_query, math
-    sub_queries: List[str] = []
-    direct_response: Optional[str] = None
-    math_ops: Optional[List[Dict[str, Any]]] = []
-
-class OrchestratorV2AnalyzeRequest(BaseModel):
-    user_query: str
-    chunks: List[Dict[str, Any]]  # raw chunks with source_ids
-    intent: Optional[str] = None
-    sub_queries: Optional[List[str]] = None
-
-class OrchestratorV2AnalyzeResponse(BaseModel):
-    assessments: List[Dict[str, Any]]  # {source_id, keep, reason}
-
-class OrchestratorV2SynthesizeRequest(BaseModel):
-    user_query: str
-    curated_chunks: List[Dict[str, Any]]
-    chat_history: Optional[List[Dict[str, str]]] = None
-    prior_sources: Optional[List[Dict[str, Any]]] = None  # sources from previous messages for follow-ups
-
-class OrchestratorV2SynthesizeResponse(BaseModel):
-    response: str
-    used_source_ids: List[str] = []
-
-class OrchestratorControllerRequest(BaseModel):
-    user_query: str
-    chat_history: Optional[List[Dict[str, str]]] = None
-    accumulator: str = ""
-    search_count: int = 0
-    time_elapsed_ms: int = 0
-    collected_chunks_summary: str = ""
-
-class OrchestratorControllerResponse(BaseModel):
-    action: str
-    action_input: Any
-
+class BookmarkRestructureChunkResponse(BaseModel):
+    refined_chunk: Dict[str, Any]
