@@ -38,7 +38,9 @@
         "<all_urls>"
       ],
       "js": [
-        "page-structure-extractor.js"
+        "page-structure-extractor.js",
+        "form-extractor.js",
+        "form-injector.js"
       ],
       "run_at": "document_idle"
     },

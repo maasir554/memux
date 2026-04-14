@@ -5,7 +5,9 @@ from typing import Any, Dict, List, Optional
 import os
 import requests
 from fastapi import Response
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
+import uuid
 
 load_dotenv()
 
@@ -38,6 +40,9 @@ from extraction import (
 from vision_ocr import extract_text_from_image, infer_bookmark_title
 from embeddings import generate_embeddings
 from bookmark_capture import capture_bookmark, process_bookmark_structured
+from agent_orchestrator import run_multi_agent_stream
+
+RUN_STATE_STORE: Dict[str, Dict[str, Any]] = {}
 
 @app.post("/extract", response_model=ExtractionResponse)
 def extract_tables(request: ExtractionRequest):
@@ -222,6 +227,19 @@ class DevBookmarkFragmentResponse(BaseModel):
     debug_info: Dict[str, Any]
 
 
+class AgentChatRequest(BaseModel):
+    user_query: str
+    context_chunks: List[Dict[str, Any]]
+    conversation: Optional[List[Dict[str, str]]] = None
+    run_id: Optional[str] = None
+
+
+class AgentRunControlResponse(BaseModel):
+    run_id: str
+    status: str
+    phase: str
+
+
 def chunk_text_blocks(text_blocks: List[str], chunk_size: int = 900, overlap: int = 150) -> List[str]:
     combined = "\n\n".join([b.strip() for b in text_blocks if b and b.strip()])
     if not combined:
@@ -334,6 +352,46 @@ def rag_chat(request: RagRequest):
         used_chunk_ids=result.get("used_chunk_ids", []),
         debug_info=result.get("debug_info")
     )
+
+
+@app.post("/agent_chat/stream")
+def agent_chat_stream(request: AgentChatRequest):
+    run_id = request.run_id or str(uuid.uuid4())
+    stream = run_multi_agent_stream(
+        run_id=run_id,
+        user_query=request.user_query,
+        context_chunks=request.context_chunks,
+        conversation=request.conversation or [],
+        run_state_store=RUN_STATE_STORE,
+    )
+    return StreamingResponse(stream, media_type="text/event-stream")
+
+
+def _update_run_status(run_id: str, status: str) -> Dict[str, Any]:
+    run = RUN_STATE_STORE.get(run_id)
+    if not run:
+        run = {"run_id": run_id, "status": "running", "phase": "planning"}
+        RUN_STATE_STORE[run_id] = run
+    run["status"] = status
+    return run
+
+
+@app.post("/agent_chat/run/{run_id}/pause", response_model=AgentRunControlResponse)
+def agent_chat_pause(run_id: str):
+    run = _update_run_status(run_id, "paused")
+    return AgentRunControlResponse(run_id=run_id, status=run["status"], phase=run.get("phase", "unknown"))
+
+
+@app.post("/agent_chat/run/{run_id}/resume", response_model=AgentRunControlResponse)
+def agent_chat_resume(run_id: str):
+    run = _update_run_status(run_id, "running")
+    return AgentRunControlResponse(run_id=run_id, status=run["status"], phase=run.get("phase", "unknown"))
+
+
+@app.post("/agent_chat/run/{run_id}/stop", response_model=AgentRunControlResponse)
+def agent_chat_stop(run_id: str):
+    run = _update_run_status(run_id, "stopped")
+    return AgentRunControlResponse(run_id=run_id, status=run["status"], phase=run.get("phase", "unknown"))
 
 @app.get("/proxy_pdf")
 def proxy_pdf(url: str):

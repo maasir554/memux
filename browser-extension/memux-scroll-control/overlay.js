@@ -184,6 +184,7 @@
           <button class="ghost" id="memux-snip-btn">Save Screen Snip</button>
           <button class="solid" id="memux-bookmark-btn">Save Bookmark</button>
         </div>
+        <button class="solid full" id="memux-autofill-btn" style="background: linear-gradient(90deg, #10b981 0%, #34d399 100%); margin-bottom: 8px;">Auto-fill Form via Agent</button>
         <button class="ghost full" id="memux-dev-extract-btn">Extract Page (Dev)</button>
         <div class="status" id="memux-status">Ready.</div>
       </div>
@@ -203,6 +204,7 @@
   const snipBtn = shadow.getElementById("memux-snip-btn");
   const bookmarkBtn = shadow.getElementById("memux-bookmark-btn");
   const devExtractBtn = shadow.getElementById("memux-dev-extract-btn");
+  const autofillBtn = shadow.getElementById("memux-autofill-btn");
 
   if (!urlInput) return;
   urlInput.value = window.location.href;
@@ -214,6 +216,7 @@
     bookmarkBtn.disabled = busy;
     snipBtn.disabled = busy;
     devExtractBtn.disabled = busy;
+    autofillBtn.disabled = busy;
     openBtn.disabled = busy;
   };
 
@@ -405,6 +408,40 @@
     }
   };
 
+  const autofillForm = async () => {
+    setBusy(true);
+    try {
+      const extractor = window.__memuxFormExtractor;
+      const injector = window.__memuxFormInjector;
+      if (!extractor || !injector) throw new Error("Form agent scripts not loaded. Refresh page.");
+
+      setStatus("Extracting form schema...");
+      const schema = extractor.extract();
+      if (schema.error) throw new Error(schema.error);
+
+      setStatus("Agent mapping profile to fields via MEMUX App...");
+      const res = await postToBackground("AUTOFILL_FORM", { formStructure: schema });
+      
+      const mapped = res.mapped_fields || {};
+      const blobs = res.file_blobs || {};
+      const fieldCount = Object.keys(mapped).length + Object.keys(blobs).length;
+      
+      if (fieldCount === 0) {
+          setStatus('No fields matched from profile.');
+          return;
+      }
+      
+      setStatus(`Injecting ${fieldCount} fields...`);
+      await injector.inject(mapped, blobs);
+
+      setStatus(`Form successfully filled by MEMUX Agent!`);
+    } catch (err) {
+      setStatus(`Autofill failed: ${err?.message || err}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openPanel = async () => {
     panel.style.display = "block";
     if (!spacesLoaded) {
@@ -423,4 +460,5 @@
   bookmarkBtn.addEventListener("click", saveBookmark);
   snipBtn.addEventListener("click", saveSnip);
   devExtractBtn.addEventListener("click", runDevExtraction);
+  autofillBtn.addEventListener("click", autofillForm);
 })();

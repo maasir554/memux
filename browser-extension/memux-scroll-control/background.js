@@ -252,6 +252,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (command === "SAVE_DEV_EXTRACT") {
       return await handleOverlayRelayToApp("EXT_SAVE_DEV_EXTRACT", payload);
     }
+    if (command === "AUTOFILL_FORM") {
+      return await handleOverlayRelayToApp("EXT_AUTOFILL_FORM", payload);
+    }
     throw new Error(`Unsupported overlay command: ${String(command)}`);
   };
 

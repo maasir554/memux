@@ -7,14 +7,14 @@ from typing import Dict
 clients = []
 key_index = 0
 
-for i in range(7):
+for i in range(10):
     cur_key = os.environ.get(f"GROQ_API_KEY_{i+1}")
     clients.append(Groq(api_key=cur_key))
 
 def get_next_client():
     """Get next client using round-robin distribution"""
     global key_index
-    client = clients[key_index % 7]
+    client = clients[key_index % 10]
     key_index += 1
     return client
 

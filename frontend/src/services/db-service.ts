@@ -25,7 +25,7 @@ export interface ContextSpace {
     archived_at?: string | null;
 }
 
-export type ContextSourceType = 'pdf' | 'bookmark' | 'snip';
+export type ContextSourceType = 'pdf' | 'bookmark' | 'snip' | 'persona';
 
 export interface ContextSource {
     id: string;
@@ -51,7 +51,7 @@ export interface ContextSource {
 export interface ContextSegment {
     id: string;
     source_id: string;
-    segment_type: 'table_row' | 'paragraph' | 'ocr_block' | 'caption' | 'bookmark_summary' | 'section_summary' | 'link' | 'image_link';
+    segment_type: 'table_row' | 'paragraph' | 'ocr_block' | 'caption' | 'bookmark_summary' | 'section_summary' | 'link' | 'image_link' | 'persona_field';
     segment_index: number;
     page_number?: number | null;
     locator_json?: Record<string, any> | null;
@@ -678,6 +678,24 @@ export const dbService = {
         const created = await db.query(
             `INSERT INTO context_spaces (name, description, is_default)
              VALUES ('General Context Space', 'Auto-created default context space', TRUE)
+             RETURNING *`
+        );
+        return created.rows[0] as ContextSpace;
+    },
+
+    async getPersonalProfileSpace(): Promise<ContextSpace> {
+        const db = getDb();
+        const existing = await db.query(
+            "SELECT * FROM context_spaces WHERE name = 'Autofill Personas' AND archived_at IS NULL LIMIT 1"
+        );
+
+        if (existing.rows.length > 0) {
+            return existing.rows[0] as ContextSpace;
+        }
+
+        const created = await db.query(
+            `INSERT INTO context_spaces (name, description, is_default)
+             VALUES ('Autofill Personas', 'System-managed space for personal documents used by the Autofill Agent', FALSE)
              RETURNING *`
         );
         return created.rows[0] as ContextSpace;
@@ -1778,6 +1796,48 @@ export const dbService = {
             ]
         );
         return (res.rows[0] as any).id as string;
+    },
+
+    async searchPersonaFieldsGrep(spaceId: string, keywords: string[], limit: number = 10): Promise<ContextSegment[]> {
+        const db = getDb();
+        const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+        if (keywords.length === 0) return [];
+        const ilikeConditions = keywords.map((kw, i) => `cs.structured_json::text ILIKE $${i + 3}`);
+        const whereClause = `(${ilikeConditions.join(' OR ')})`;
+        
+        const params: any[] = [spaceId, 'persona_field', ...keywords.map(kw => `%${kw}%`), safeLimit];
+        const res = await db.query(
+            `SELECT cs.id, cs.source_id, cs.segment_type, cs.segment_index, cs.text_content, cs.structured_json, cs.created_at, cs.updated_at
+             FROM context_segments cs
+             JOIN context_sources src ON src.id = cs.source_id
+             WHERE src.space_id = $1 AND src.deleted_at IS NULL AND src.status = 'indexed' AND cs.segment_type = $2 AND ${whereClause}
+             ORDER BY cs.created_at DESC
+             LIMIT $${params.length}`,
+            params
+        );
+        return res.rows.map((row: any) => ({
+            ...row,
+            structured_json: typeof row.structured_json === 'string' ? JSON.parse(row.structured_json) : row.structured_json
+        })) as ContextSegment[];
+    },
+
+    async searchPersonaFieldsSemantic(spaceId: string, embedding: number[], limit: number = 10): Promise<ContextSegment[]> {
+        const db = getDb();
+        const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+        if (!embedding || embedding.length === 0) return [];
+        const res = await db.query(
+            `SELECT cs.id, cs.source_id, cs.segment_type, cs.segment_index, cs.text_content, cs.structured_json, cs.created_at, cs.updated_at, (cs.embedding <=> $1::vector) as distance
+             FROM context_segments cs
+             JOIN context_sources src ON src.id = cs.source_id
+             WHERE src.space_id = $2 AND src.deleted_at IS NULL AND src.status = 'indexed' AND cs.segment_type = 'persona_field' AND cs.embedding IS NOT NULL
+             ORDER BY distance ASC
+             LIMIT $3`,
+            [JSON.stringify(embedding), spaceId, safeLimit]
+        );
+        return res.rows.map((row: any) => ({
+            ...row,
+            structured_json: typeof row.structured_json === 'string' ? JSON.parse(row.structured_json) : row.structured_json
+        })) as ContextSegment[];
     },
 
     async getDevPageExtractions(limit: number = 100): Promise<DevPageExtraction[]> {

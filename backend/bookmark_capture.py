@@ -723,17 +723,67 @@ def _fetch_screenshot_candidates(url: str) -> List[Dict[str, str | bytes]]:
     return _fetch_screenshots_thumio(url, max_images=MAX_SCREENSHOTS)
 
 
+def _fetch_html_playwright(url: str) -> tuple[str, str]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception:
+        return url, ""
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--disable-dev-shm-usage", "--no-sandbox"],
+            )
+            context = browser.new_context(
+                viewport={"width": 1366, "height": 900},
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+            page = context.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(1000)
+            html = page.content()
+            final_url = page.url
+            context.close()
+            browser.close()
+            return final_url, html
+    except Exception as e:
+        print(f"Skipping playwright HTML fetch due to error: {e}")
+        return url, ""
+
+
 def _capture_raw(url: str, capture_mode: str = "dual") -> Dict[str, Any]:
     normalized = _normalize_url(url)
-    response = requests.get(
-        normalized,
-        headers={"User-Agent": USER_AGENT},
-        timeout=25,
-    )
-    response.raise_for_status()
+    
+    final_url = normalized
+    html = ""
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Upgrade-Insecure-Requests": "1"
+    }
 
-    final_url = response.url
-    html = response.text or ""
+    try:
+        response = requests.get(
+            normalized,
+            headers=headers,
+            timeout=25,
+        )
+        response.raise_for_status()
+        final_url = response.url
+        html = response.text or ""
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code in {401, 403, 406, 429}:
+            final_url, html = _fetch_html_playwright(normalized)
+            if not html:
+                # Fallback gracefully rather than crashing
+                final_url = e.response.url if e.response else normalized
+                html = f"<html><head><title>Content Protected or Unavailable</title></head><body><h1>Content Protected (Status {e.response.status_code})</h1><p>The target server blocked direct HTML extraction. Relying on OCR and screenshots where available.</p></body></html>"
+        else:
+            raise
+
     title = _extract_title(html)
     canonical_url = _extract_canonical(html, final_url)
 

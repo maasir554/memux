@@ -10,10 +10,13 @@ import { FileExplorer } from "@/components/file-explorer"
 import { FileDetailsView } from "@/components/file-details-view"
 import { ContextSourceDetailsView } from "@/components/context-source-details-view"
 import { ContextSpacesView } from "@/components/context-spaces-view"
+import { ProfileDatalakeView } from "@/components/profile-datalake-view"
 import { dbService } from "@/services/db-service"
+import { autofillAgentService } from "@/services/autofill-agent-service"
 import type { ContextExplorerItem } from "@/services/db-service"
-import { Loader2, Trash2, Layers, FlaskConical, SearchCode } from "lucide-react"
+import { Loader2, Trash2, Layers, FlaskConical, SearchCode, UserCircle } from "lucide-react"
 import ChunkSearchView from "@/components/chunk-search-view"
+import AgentChatInterface from "@/components/agent-chat-interface"
 
 import { useExtractionStore } from '@/store/extraction-store'
 
@@ -137,6 +140,16 @@ function App() {
           return;
         }
 
+        if (command === "EXT_AUTOFILL_FORM") {
+          const formStructure = commandPayload.formStructure;
+          if (!formStructure) {
+            throw new Error("Form structure payload is missing.");
+          }
+          const result = await autofillAgentService.fillForm(formStructure);
+          respond(true, result);
+          return;
+        }
+
         throw new Error(`Unsupported app command: ${command}`);
       } catch (error: any) {
         respond(false, {}, error?.message || "MEMUX app command failed.");
@@ -161,10 +174,12 @@ function App() {
   }
 
   const activeTab = location.startsWith('/chat') ? 'chat'
+    : location.startsWith('/agent') ? 'agent'
     : location.startsWith('/data') ? 'data'
       : location.startsWith('/dev') ? 'dev'
       : location.startsWith('/chunks') ? 'chunks'
       : location.startsWith('/spaces') ? 'spaces'
+      : location.startsWith('/personas') ? 'personas'
         : location.startsWith('/trash') ? 'trash'
           : 'dashboard';
 
@@ -180,6 +195,7 @@ function App() {
             <TabsList className="transition-all duration-300 h-11 rounded-full border border-border dark:border-white/10 bg-muted/60 dark:bg-[#2b2d31] p-1 gap-1">
               <TabsTrigger value="dashboard" className="transition-all duration-300 rounded-full px-3 data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">Overview</TabsTrigger>
               <TabsTrigger value="chat" className="transition-all duration-300 rounded-full px-3 data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">Chat & RAG</TabsTrigger>
+              <TabsTrigger value="agent" className="transition-all duration-300 rounded-full px-3 data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">Beta Agent Chat</TabsTrigger>
               <TabsTrigger value="data" className="transition-all duration-300 rounded-full px-3 data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">Data Explorer</TabsTrigger>
               <TabsTrigger value="dev" className="transition-all duration-300 rounded-full px-3 gap-1.5 data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
                 <FlaskConical className="w-3.5 h-3.5" />
@@ -192,6 +208,10 @@ function App() {
               <TabsTrigger value="spaces" className="transition-all duration-300 rounded-full px-3 gap-1.5 data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
                 <Layers className="w-3.5 h-3.5" />
                 Spaces
+              </TabsTrigger>
+              <TabsTrigger value="personas" className="transition-all duration-300 rounded-full px-3 gap-1.5 data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
+                <UserCircle className="w-3.5 h-3.5" />
+                Personas
               </TabsTrigger>
               <TabsTrigger value="trash" className="gap-1.5 transition-all duration-300 rounded-full px-3 data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
                 <Trash2 className={`transition-all duration-300 ${isScrolled ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
@@ -239,6 +259,10 @@ function App() {
           </div>
         </TabsContent>
 
+        <TabsContent value="agent" className="flex-1 h-full overflow-hidden">
+          <AgentChatInterface />
+        </TabsContent>
+
         <TabsContent value="data" className="flex-1 h-full overflow-hidden">
           <DataExplorer />
         </TabsContent>
@@ -253,6 +277,10 @@ function App() {
 
         <TabsContent value="spaces" className="flex-1 overflow-y-auto pr-1 pb-4">
           <ContextSpacesView />
+        </TabsContent>
+
+        <TabsContent value="personas" className="flex-1 overflow-y-auto pr-1 pb-4">
+          <ProfileDatalakeView />
         </TabsContent>
 
         <TabsContent value="trash" className="flex-1 h-full overflow-hidden">

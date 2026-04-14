@@ -5,11 +5,10 @@
  */
 import * as pdfjsLib from "pdfjs-dist";
 
-// Import worker code as raw string
-import pdfWorkerCode from "pdfjs-dist/build/pdf.worker.min.mjs?raw";
+// Use Vite's URL resolution for modern ES Module workers (fixes infinite hang)
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-const blob = new Blob([pdfWorkerCode], { type: "application/javascript" });
-pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const cMapUrl = "/cmaps/";
 const standardFontDataUrl = "/standard_fonts/";
@@ -68,10 +67,33 @@ export async function renderPdfPageMainThread(
 export async function getPdfPageCount(file: File): Promise<number> {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({
-        data: arrayBuffer,
+        data: new Uint8Array(arrayBuffer),
         standardFontDataUrl,
         cMapUrl,
         cMapPacked: true,
     }).promise;
     return pdf.numPages;
+}
+
+/**
+ * Extracts raw text from a PDF document sequentially for LLM AI inferences
+ */
+export async function extractPdfText(file: File): Promise<string> {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({
+        data: new Uint8Array(arrayBuffer),
+        standardFontDataUrl,
+        cMapUrl,
+        cMapPacked: true,
+    }).promise;
+    
+    let text = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        // Extract string values
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        text += `\n--- Page ${i} ---\n${pageText}\n`;
+    }
+    return text.trim();
 }
