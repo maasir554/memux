@@ -717,9 +717,6 @@ def _fetch_screenshots_thumio(url: str, max_images: int = MAX_SCREENSHOTS) -> Li
 
 
 def _fetch_screenshot_candidates(url: str) -> List[Dict[str, str | bytes]]:
-    playwright_shots = _fetch_screenshots_playwright(url, max_images=MAX_SCREENSHOTS)
-    if playwright_shots:
-        return playwright_shots
     return _fetch_screenshots_thumio(url, max_images=MAX_SCREENSHOTS)
 
 
