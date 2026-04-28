@@ -212,7 +212,8 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
             // If failed or CORS error (often opaque response or throw), try proxy
             if (!res || !res.ok) {
                 console.log("Direct fetch failed, trying proxy...");
-                const proxyUrl = `http://localhost:8000/proxy_pdf?url=${encodeURIComponent(url)}`;
+                const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+                const proxyUrl = `${baseUrl}/proxy_pdf?url=${encodeURIComponent(url)}`;
                 res = await fetch(proxyUrl);
             }
 
