@@ -102,7 +102,7 @@ function SourceLink({ source }: { source: SourceChunk }) {
     return null;
 }
 
-function SourcesModal({ sources }: { sources: SourceChunk[] }) {
+export function SourcesModal({ sources }: { sources: SourceChunk[] }) {
     const [expandedSourceIds, setExpandedSourceIds] = useState<Record<string, boolean>>({});
     if (!sources || sources.length === 0) return null;
 
@@ -269,7 +269,7 @@ function DebugStepRow({
     );
 }
 
-function RagDebugModal({ debugInfo, retrievedSources, usedSources }: { debugInfo?: any; retrievedSources?: SourceChunk[]; usedSources?: SourceChunk[] }) {
+export function RagDebugModal({ debugInfo, retrievedSources, usedSources }: { debugInfo?: any; retrievedSources?: SourceChunk[]; usedSources?: SourceChunk[] }) {
     if (!debugInfo && (!retrievedSources || retrievedSources.length === 0)) return null;
 
     const backendDebug = debugInfo?.backend || debugInfo;

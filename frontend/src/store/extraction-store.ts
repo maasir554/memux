@@ -610,7 +610,6 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
             const allScreenshotResults: any[] = [];
             let previousContext: any = {};
 
-            const debugInfo: Record<number, any> = {};
             const blobToBase64 = async (blob: Blob): Promise<string> => {
                 return await new Promise<string>((resolve, reject) => {
                     const reader = new FileReader();
